@@ -1,5 +1,6 @@
-# beer_map
-Test project using Claude Code to create an interactive map based on a previous project
+# Beer Map
+
+Test project using Claude Code to create an interactive map based on a previous project: the most awarded beer style by state, according to the Great American Beer awards.
 
 **[View the interactive map](https://bamattre.github.io/beer_map/)**
 
