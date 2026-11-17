@@ -1,8 +1,9 @@
 """
 Great American Beers: interactive tile map of the most awarded beer style by state.
 
-Python / Altair port of beer_map_R.R (Tidy Tuesday 2020-10-20, Great American
-Beer Festival). Run it with:
+Python / Altair port of beer_map_R.R (Great American Beer Festival medals).
+It reads data/beer_awards.csv, which update_data.py builds from the Tidy
+Tuesday 2020-10-20 dataset plus the winner-list PDFs in raw/. Run it with:
 
     pip install altair pandas
     python beer_map.py
@@ -17,11 +18,9 @@ from pathlib import Path
 import altair as alt
 import pandas as pd
 
-DATA_URL = (
-    "https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/"
-    "data/2020/2020-10-20/beer_awards.csv"
-)
-OUT_FILE = Path(__file__).parent / "docs" / "index.html"
+ROOT = Path(__file__).parent
+DATA_FILE = ROOT / "data" / "beer_awards.csv"
+OUT_FILE = ROOT / "docs" / "index.html"
 
 BG = "#242F40"
 GOLD = "#EBAA31"
@@ -30,7 +29,7 @@ FONT = "Bahnschrift, 'Segoe UI', Helvetica, Arial, sans-serif"
 # Style groups, checked in order (same rules as the R case_when).
 STYLE_RULES = [
     ("Lager/Pilsner/Bock", "Lager|Pilsener|Pilsners|Bock"),
-    ("IPA", "India Pale Ale"),
+    ("IPA", r"India Pale Ale|\bIPA\b"),
     ("Pale/Amber Ale", "Pale Ale|Amber Ale"),
     ("Porter/Stout/Rye/Barrel Aged",
      "Porter|Stout|Rye|Scottish-Style Ale|Schwarzbier|Barrel-Aged"),
@@ -82,7 +81,7 @@ def classify(category: str) -> str:
 
 
 def load_awards() -> pd.DataFrame:
-    beer = pd.read_csv(DATA_URL)
+    beer = pd.read_csv(DATA_FILE)
     beer["state"] = beer["state"].str.upper()
     style_map = {c: classify(c) for c in beer["category"].unique()}
     beer["style"] = beer["category"].map(style_map)
@@ -128,7 +127,8 @@ def style_counts(beer: pd.DataFrame) -> pd.DataFrame:
     return beer.groupby(["state", "style"]).size().reset_index(name="n")
 
 
-def build_chart(tiles: pd.DataFrame, counts: pd.DataFrame) -> alt.Chart:
+def build_chart(tiles: pd.DataFrame, counts: pd.DataFrame,
+                years: str) -> alt.Chart:
     present = set(tiles["style"])
     domain = [s for s in STYLE_COLORS if s in present]
     color = alt.Color(
@@ -203,7 +203,7 @@ def build_chart(tiles: pd.DataFrame, counts: pd.DataFrame) -> alt.Chart:
                 "Great American Beers",
                 subtitle=[
                     "Most awarded beer style by state at the Great American "
-                    "Beer Festival, 1987-2020.",
+                    f"Beer Festival, {years}.",
                     "Hover a state for details. Click to filter the bar chart "
                     "(shift-click for several, double-click to reset).",
                 ],
@@ -224,7 +224,8 @@ def build_chart(tiles: pd.DataFrame, counts: pd.DataFrame) -> alt.Chart:
 def main() -> None:
     beer = load_awards()
     tiles = top_style_by_state(beer)
-    chart = build_chart(tiles, style_counts(beer))
+    years = f"{beer['year'].min()}-{beer['year'].max()}"
+    chart = build_chart(tiles, style_counts(beer), years)
     OUT_FILE.parent.mkdir(exist_ok=True)
     chart.save(OUT_FILE)
     print(f"Wrote {OUT_FILE}")
