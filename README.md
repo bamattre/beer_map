@@ -25,4 +25,4 @@ python beer_map.py
 
 `update_data.py` skips the Pro-Am, collaboration and cider competitions, and prints any category without exactly three medals (a few genuinely had no gold or bronze awarded). Entries the PDFs get wrong are corrected in its `MANUAL_FIXES`.
 
-It writes `docs/index.html`, a single self-contained page. Hover a state for details; click states to filter the bar chart. To publish it, enable GitHub Pages from the `/docs` folder.
+It writes `docs/index.html`, a single self-contained page. Hover a state for details; click states to see their top 10 award categories in the bar chart; click a style group in the legend to limit the chart to that group (e.g. the top 10 "Something Else" categories). To publish it, enable GitHub Pages from the `/docs` folder.

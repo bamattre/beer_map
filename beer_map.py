@@ -122,9 +122,10 @@ def top_style_by_state(beer: pd.DataFrame) -> pd.DataFrame:
     return tiles
 
 
-def style_counts(beer: pd.DataFrame) -> pd.DataFrame:
-    """Awards per state and style, for the linked bar chart."""
-    return beer.groupby(["state", "style"]).size().reset_index(name="n")
+def category_counts(beer: pd.DataFrame) -> pd.DataFrame:
+    """Awards per state and category, for the linked bar chart."""
+    return (beer.groupby(["state", "category", "style"]).size()
+            .reset_index(name="n"))
 
 
 def build_chart(tiles: pd.DataFrame, counts: pd.DataFrame,
@@ -138,7 +139,15 @@ def build_chart(tiles: pd.DataFrame, counts: pd.DataFrame,
                           symbolType="square", symbolSize=200, labelLimit=250),
     )
 
-    pick = alt.selection_point(fields=["state"], name="pick")
+    # Only clicks on a state tile change the state selection, so clicking the
+    # legend (or empty space) keeps it. Double-click clears it.
+    pick = alt.selection_point(
+        fields=["state"], name="pick",
+        on="click[event.item && event.item.datum && event.item.datum.state]",
+        clear="dblclick",
+    )
+    # Clicking a legend entry picks a style group (shift-click for several).
+    group = alt.selection_point(fields=["style"], bind="legend", name="group")
 
     tile_size = 52
     x = alt.X("col:O", axis=None)
@@ -149,7 +158,7 @@ def build_chart(tiles: pd.DataFrame, counts: pd.DataFrame,
         cornerRadius=6, stroke=BG, strokeWidth=3, cursor="pointer"
     ).encode(
         color=color,
-        opacity=alt.condition(pick, alt.value(1), alt.value(0.3)),
+        opacity=alt.condition(pick & group, alt.value(1), alt.value(0.3)),
         tooltip=[
             alt.Tooltip("state:N", title="State"),
             alt.Tooltip("style:N", title="Top style group"),
@@ -160,7 +169,7 @@ def build_chart(tiles: pd.DataFrame, counts: pd.DataFrame,
             alt.Tooltip("Silver:Q"),
             alt.Tooltip("Bronze:Q"),
         ],
-    ).add_params(pick)
+    ).add_params(pick, group)
     labels = base.mark_text(fontSize=13, fontWeight="bold", font=FONT).encode(
         text="state:N",
         color=alt.Color("label_color:N", scale=None),
@@ -169,27 +178,42 @@ def build_chart(tiles: pd.DataFrame, counts: pd.DataFrame,
         width=tile_size * 12, height=tile_size * 8
     )
 
+    # Top 10 categories for the clicked states (or all states), optionally
+    # limited to the style groups clicked in the legend. Ties are broken
+    # alphabetically, the same way the map picks each state's top category,
+    # so the top bar always matches the state's color.
     bars = (
         alt.Chart(counts)
         .transform_filter(pick)
-        .transform_aggregate(n="sum(n)", groupby=["style"])
+        .transform_filter(group)
+        .transform_aggregate(n="sum(n)", groupby=["category", "style"])
+        .transform_window(
+            rank="row_number()",
+            sort=[alt.SortField("n", order="descending"),
+                  alt.SortField("category", order="ascending")],
+        )
+        .transform_filter(alt.datum.rank <= 10)
         .mark_bar(cornerRadiusEnd=4, stroke="#ffffff33")
         .encode(
-            y=alt.Y("style:N", sort="-x", title=None,
-                    axis=alt.Axis(labelLimit=220)),
+            y=alt.Y("category:N", title=None,
+                    sort=alt.EncodingSortField("rank", order="ascending"),
+                    # fixed label width so long names don't resize the page
+                    axis=alt.Axis(labelLimit=250, minExtent=250)),
             x=alt.X("n:Q", title="Medals awarded"),
             color=alt.Color("style:N",
                             scale=alt.Scale(domain=list(STYLE_COLORS),
                                             range=list(STYLE_COLORS.values())),
                             legend=None),
-            tooltip=[alt.Tooltip("style:N", title="Style group"),
+            tooltip=[alt.Tooltip("category:N", title="Category"),
+                     alt.Tooltip("style:N", title="Style group"),
                      alt.Tooltip("n:Q", title="Medals")],
         )
         .properties(
-            width=320, height=tile_size * 8 - 40,
+            width=260, height=tile_size * 8 - 40,
             title=alt.Title(
-                "Medals by style group",
-                subtitle="All states, or the states you click",
+                "Top 10 most awarded categories",
+                subtitle=["All states, or the states you click.",
+                          "Click a legend entry to see one style group."],
                 anchor="start", color=GOLD, subtitleColor="#c9d1dc",
             ),
         )
@@ -225,7 +249,7 @@ def main() -> None:
     beer = load_awards()
     tiles = top_style_by_state(beer)
     years = f"{beer['year'].min()}-{beer['year'].max()}"
-    chart = build_chart(tiles, style_counts(beer), years)
+    chart = build_chart(tiles, category_counts(beer), years)
     OUT_FILE.parent.mkdir(exist_ok=True)
     chart.save(OUT_FILE)
     print(f"Wrote {OUT_FILE}")
