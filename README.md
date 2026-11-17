@@ -1,6 +1,10 @@
 # beer_map
 Test project using Claude Code to create an interactive map based on a previous project
 
+**[View the interactive map](https://bamattre.github.io/beer_map/)**
+
+[![Great American Beers: most awarded beer style by state](docs/preview.png)](https://bamattre.github.io/beer_map/)
+
 ## Interactive version (Python / Altair)
 
 `beer_map.py` rebuilds the map as an interactive web page:
